@@ -62,7 +62,7 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint",
     "verify:demo": "tsx scripts/verify-demo.ts",
-    "verify:supabase": "tsx scripts/verify-supabase.ts"
+    "verify:supabase": "supabase test db --local && tsx scripts/verify-supabase.ts"
   },
   "private": true
 }
