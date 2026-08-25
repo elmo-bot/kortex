@@ -28,9 +28,12 @@ interface FixtureIds {
   entities: Record<'contact' | 'company' | 'idea' | 'project' | 'meeting' | 'document', string>;
   spareEntities: Record<'contact' | 'company' | 'idea' | 'project' | 'meeting' | 'document', string>;
   relationship: string;
+  nullableRelationship: string;
   tag: string;
   timelineEvent: string;
+  nullableTimelineEvent: string;
   followUp: string;
+  nullableFollowUp: string;
   interpretation: string;
 }
 
@@ -110,9 +113,12 @@ function makeFixtureIds(): FixtureIds {
     entities: entityIds(),
     spareEntities: entityIds(),
     relationship: randomUUID(),
+    nullableRelationship: randomUUID(),
     tag: randomUUID(),
     timelineEvent: randomUUID(),
+    nullableTimelineEvent: randomUUID(),
     followUp: randomUUID(),
+    nullableFollowUp: randomUUID(),
     interpretation: randomUUID(),
   };
 }
@@ -193,33 +199,64 @@ async function seedUser(client: SupabaseClient, ownerId: string, ids: FixtureIds
   await insertRows(client, 'projects', { entity_id: ids.entities.project, owner_id: ownerId, description: `${label} project` });
   await insertRows(client, 'meetings', { entity_id: ids.entities.meeting, owner_id: ownerId, raw_notes: `${label} meeting` });
   await insertRows(client, 'documents', { entity_id: ids.entities.document, owner_id: ownerId, body_text: `${label} document` });
-  await insertRows(client, 'relationships', {
-    id: ids.relationship,
-    owner_id: ownerId,
-    source_entity_id: ids.entities.contact,
-    target_entity_id: ids.entities.company,
-    relationship_type: 'local_verification',
-    context: `${label} relationship`,
-    source_capture_id: ids.captures.primary,
-  });
+  await insertRows(client, 'relationships', [
+    {
+      id: ids.relationship,
+      owner_id: ownerId,
+      source_entity_id: ids.entities.contact,
+      target_entity_id: ids.entities.company,
+      relationship_type: 'local_verification',
+      context: `${label} relationship`,
+      source_capture_id: ids.captures.primary,
+    },
+    {
+      id: ids.nullableRelationship,
+      owner_id: ownerId,
+      source_entity_id: ids.spareEntities.idea,
+      target_entity_id: ids.spareEntities.project,
+      relationship_type: 'nullable_verification',
+      context: `${label} nullable relationship`,
+      source_capture_id: null,
+    },
+  ]);
   await insertRows(client, 'tags', { id: ids.tag, owner_id: ownerId, name: `${label} verification tag` });
   await insertRows(client, 'entity_tags', { owner_id: ownerId, entity_id: ids.entities.idea, tag_id: ids.tag });
-  await insertRows(client, 'timeline_events', {
-    id: ids.timelineEvent,
-    owner_id: ownerId,
-    entity_id: ids.entities.project,
-    capture_id: ids.captures.primary,
-    event_kind: 'local_verification',
-    title: `${label} timeline event`,
-  });
-  await insertRows(client, 'follow_ups', {
-    id: ids.followUp,
-    owner_id: ownerId,
-    capture_id: ids.captures.primary,
-    related_entity_id: ids.entities.contact,
-    description: `${label} follow up`,
-    date_interpretation: 'local verification',
-  });
+  await insertRows(client, 'timeline_events', [
+    {
+      id: ids.timelineEvent,
+      owner_id: ownerId,
+      entity_id: ids.entities.project,
+      capture_id: ids.captures.primary,
+      event_kind: 'local_verification',
+      title: `${label} timeline event`,
+    },
+    {
+      id: ids.nullableTimelineEvent,
+      owner_id: ownerId,
+      entity_id: ids.spareEntities.project,
+      capture_id: null,
+      event_kind: 'nullable_verification',
+      title: `${label} nullable timeline event`,
+    },
+  ]);
+  await insertRows(client, 'follow_ups', [
+    {
+      id: ids.followUp,
+      owner_id: ownerId,
+      capture_id: ids.captures.primary,
+      related_entity_id: ids.entities.contact,
+      description: `${label} follow up`,
+      date_interpretation: 'local verification',
+    },
+    {
+      id: ids.nullableFollowUp,
+      owner_id: ownerId,
+      capture_id: null,
+      related_entity_id: ids.spareEntities.contact,
+      description: `${label} nullable follow up`,
+      date_interpretation: 'local verification',
+    },
+  ]);
   await insertRows(client, 'ai_interpretations', {
     id: ids.interpretation,
     owner_id: ownerId,
