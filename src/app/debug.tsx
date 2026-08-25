@@ -1,0 +1,10 @@
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useKortex } from '@/store/KortexStore';
+import { colors, spacing, type } from '@/design/tokens';
+export default function DebugScreen() {
+  const { snapshot, mode, error } = useKortex(); const latest = snapshot.captures[0];
+  if (!__DEV__) return <SafeAreaView style={styles.safe}><Text style={styles.title}>Unavailable</Text></SafeAreaView>;
+  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}><Text style={styles.label}>DEVELOPMENT ONLY</Text><Text style={styles.title}>Capture pipeline</Text><Row label="Runtime" value={mode} /><Row label="Entities" value={String(snapshot.entities.length)} /><Row label="Relationships" value={String(snapshot.relationships.length)} /><Row label="API error" value={error ?? 'None'} /><Text style={styles.section}>LATEST CAPTURE</Text><Text selectable style={styles.json}>{JSON.stringify(latest ?? { status: 'No captures yet' }, null, 2)}</Text><Text style={styles.section}>GRAPH IDS</Text><Text selectable style={styles.json}>{snapshot.entities.map(item => `${item.id}  ${item.type}  ${item.displayName}`).join('\n')}</Text></ScrollView></SafeAreaView>;
+}
+function Row({ label, value }: { label: string; value: string }) { return <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>; }
+const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.ink }, content: { padding: spacing.lg }, label: { ...type.metadata, color: colors.warning }, title: { ...type.title, color: colors.text, marginVertical: spacing.md }, row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }, rowLabel: { ...type.callout, color: colors.textMuted }, rowValue: { ...type.metadata, color: colors.text }, section: { ...type.metadata, color: colors.cyan, marginTop: spacing.xl, marginBottom: spacing.sm }, json: { fontFamily: 'SFMono-Regular', color: colors.textMuted, fontSize: 11, lineHeight: 17 } });

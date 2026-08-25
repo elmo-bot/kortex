@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Kortex",
+    "slug": "kortex",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "kortex",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#061018",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "ai.kortex.mobile",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Kortex uses your microphone only while you capture a thought.",
+        "NSSpeechRecognitionUsageDescription": "Kortex can transcribe what you choose to capture."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#061018"
+        }
+      ],
+      [
+        "expo-asset",
+        {
+          "assets": [
+            "./assets/models"
+          ]
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Kortex listens only while you capture a thought.",
+          "speechRecognitionPermission": "Kortex turns your voice into text you can review before saving."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

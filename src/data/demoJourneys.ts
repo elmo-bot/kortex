@@ -1,0 +1,2 @@
+export const sarahDemoCapture = 'I met Sarah today. She runs a design agency in Stockholm and works with several restaurant chains. She might be useful for the Monitora project. I should call her next Tuesday.';
+export const meetingIntelligenceDemoCapture = 'I have an idea for an AI tool that automatically prepares companies before customer meetings by combining CRM data, email history and public information.';

@@ -1,0 +1,49 @@
+/* eslint-disable react-hooks/immutability -- Reanimated SharedValue mutation is its documented API. */
+import { useMemo, useState } from 'react';
+import { FlatList, LayoutChangeEvent, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { useKortex } from '@/store/KortexStore';
+import { colors, radius, spacing, type } from '@/design/tokens';
+import { KortexSymbol } from '@/components/KortexSymbol';
+import { EntityGlyph } from '@/components/EntityGlyph';
+import { haptics } from '@/design/haptics';
+import { GraphCanvas } from './GraphCanvas';
+import { layoutGraph } from './graphLayout';
+
+export function ConnectionsScreen() {
+  const { snapshot, entity, related } = useKortex(); const params = useLocalSearchParams<{ focus?: string }>();
+  const [size, setSize] = useState({ width: 390, height: 620 }); const [selectedId, setSelectedId] = useState<string | undefined>(params.focus); const [history, setHistory] = useState<string[]>([]); const [listMode, setListMode] = useState(false); const [query, setQuery] = useState(''); const [zoomLevel, setZoomLevel] = useState(1); const [depth, setDepth] = useState<1 | 2>(1);
+  const focus = selectedId ? entity(selectedId) : undefined;
+  const visibleEntities = useMemo(() => query ? snapshot.entities.filter(item => item.displayName.toLowerCase().includes(query.toLowerCase()) || item.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))) : snapshot.entities, [snapshot.entities, query]);
+  const renderEntities = useMemo(() => visibleEntities.length <= 600 ? visibleEntities : [...visibleEntities].sort((a, b) => {
+    if (a.id === selectedId) return -1; if (b.id === selectedId) return 1;
+    const aRelated = selectedId ? snapshot.relationships.some(edge => (edge.sourceEntityId === selectedId && edge.targetEntityId === a.id) || (edge.targetEntityId === selectedId && edge.sourceEntityId === a.id)) : false;
+    const bRelated = selectedId ? snapshot.relationships.some(edge => (edge.sourceEntityId === selectedId && edge.targetEntityId === b.id) || (edge.targetEntityId === selectedId && edge.sourceEntityId === b.id)) : false;
+    return Number(bRelated) - Number(aRelated) || b.updatedAt.localeCompare(a.updatedAt);
+  }).slice(0, 600), [selectedId, snapshot.relationships, visibleEntities]);
+  const visibleIds = useMemo(() => new Set(renderEntities.map(item => item.id)), [renderEntities]);
+  const edges = useMemo(() => snapshot.relationships.filter(edge => visibleIds.has(edge.sourceEntityId) && visibleIds.has(edge.targetEntityId)), [snapshot.relationships, visibleIds]);
+  const layout = useMemo(() => layoutGraph(renderEntities, edges, size.width, size.height, selectedId), [renderEntities, edges, size, selectedId]);
+  const translateX = useSharedValue(0), translateY = useSharedValue(0), scale = useSharedValue(1), panStartX = useSharedValue(0), panStartY = useSharedValue(0), scaleStart = useSharedValue(1);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }, { translateY: translateY.value }, { scale: scale.value }] }));
+  const pan = Gesture.Pan().onBegin(() => { panStartX.value = translateX.value; panStartY.value = translateY.value; }).onUpdate(event => { translateX.value = panStartX.value + event.translationX; translateY.value = panStartY.value + event.translationY; });
+  const pinch = Gesture.Pinch().onBegin(() => { scaleStart.value = scale.value; }).onUpdate(event => { scale.value = Math.max(.55, Math.min(2.8, scaleStart.value * event.scale)); }).onEnd(() => { runOnJS(setZoomLevel)(scale.value); });
+  const gesture = Gesture.Simultaneous(pan, pinch);
+  const select = (id: string) => { if (selectedId && selectedId !== id) setHistory(items => [...items.slice(-7), selectedId]); setSelectedId(id); setDepth(1); setZoomLevel(1.06); translateX.value = withSpring(0); translateY.value = withSpring(0); scale.value = withSpring(1.06); haptics.selectNode(); };
+  const back = () => { const previous = history.at(-1); setHistory(items => items.slice(0, -1)); setSelectedId(previous); };
+  const onLayout = (event: LayoutChangeEvent) => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height });
+  return <SafeAreaView style={styles.safe}>
+    <View style={styles.header}><View><Text style={styles.eyebrow}>KNOWLEDGE GRAPH</Text><Text style={styles.title}>{focus ? focus.displayName : 'Connections'}</Text></View><View style={styles.headerActions}>{history.length ? <Pressable onPress={back} style={styles.iconButton} accessibilityLabel="Previous graph focus"><KortexSymbol name="arrow.uturn.backward" /></Pressable> : null}<Pressable onPress={() => setListMode(value => !value)} style={styles.iconButton} accessibilityLabel={listMode ? 'Show visual graph' : 'Show accessible relationship list'}><KortexSymbol name={listMode ? 'point.3.connected.trianglepath.dotted' : 'list.bullet'} /></Pressable></View></View>
+    <View style={styles.search}><KortexSymbol name="magnifyingglass" size={16} tint={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="Find and focus" placeholderTextColor={colors.textFaint} style={styles.searchInput} /></View>
+    {listMode ? <FlatList data={focus ? related(focus.id) : visibleEntities} keyExtractor={item => item.id} contentContainerStyle={styles.list} renderItem={({ item }) => <Pressable onPress={() => select(item.id)} style={styles.listRow}><EntityGlyph entityType={item.type} /><View style={{ flex: 1 }}><Text style={styles.listName}>{item.displayName}</Text><Text style={styles.listSub}>{item.subtitle ?? item.type}</Text></View><KortexSymbol name="scope" size={16} tint={colors.textMuted} /></Pressable>} /> : <View style={styles.canvas} onLayout={onLayout}>
+      <GestureDetector gesture={gesture}><Animated.View style={[styles.graphLayer, style]}><GraphCanvas layout={layout} selectedId={selectedId} zoomLevel={zoomLevel} depth={depth} onSelect={select} /></Animated.View></GestureDetector>
+      <View style={styles.legend}><Text style={styles.legendText}>PINCH TO ZOOM · DRAG TO MOVE</Text></View>
+      {focus ? <View style={styles.selection}><View style={styles.selectionTop}><EntityGlyph entityType={focus.type} /><View style={{ flex: 1 }}><Text style={styles.selectionName}>{focus.displayName}</Text><Text style={styles.selectionMeta}>{related(focus.id).length} direct connections</Text></View><Pressable onPress={() => { setSelectedId(undefined); setDepth(1); setZoomLevel(1); scale.value = withSpring(1); }} style={styles.iconButton}><KortexSymbol name="xmark" size={15} tint={colors.textMuted} /></Pressable></View><View style={styles.selectionActions}><Pressable onPress={() => router.push(`/entity/${focus.id}`)} style={styles.open}><Text style={styles.openText}>Open</Text></Pressable><Pressable onPress={() => router.push({ pathname: '/ask', params: { entityId: focus.id } })} style={styles.expand}><Text style={styles.expandText}>Ask Kortex</Text></Pressable><Pressable onPress={() => setDepth(value => value === 1 ? 2 : 1)} style={styles.depth}><Text style={styles.depthText}>{depth === 1 ? '2°' : '1°'}</Text></Pressable></View></View> : null}
+    </View>}
+  </SafeAreaView>;
+}
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.ink }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md }, eyebrow: { ...type.metadata, color: colors.cyan, marginBottom: 3 }, title: { ...type.title, color: colors.text }, headerActions: { flexDirection: 'row', marginLeft: 'auto' }, iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, search: { height: 42, marginHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.lineStrong, flexDirection: 'row', alignItems: 'center', gap: 9 }, searchInput: { flex: 1, ...type.callout, color: colors.text }, canvas: { flex: 1, overflow: 'hidden' }, graphLayer: { position: 'absolute', inset: 0 }, legend: { position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: 'rgba(6,16,24,.74)', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 }, legendText: { ...type.metadata, fontSize: 9, color: colors.textFaint }, selection: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, backgroundColor: 'rgba(14,29,40,.94)', borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong, padding: spacing.md }, selectionTop: { flexDirection: 'row', alignItems: 'center', gap: 12 }, selectionName: { ...type.section, color: colors.text }, selectionMeta: { ...type.callout, color: colors.textMuted, marginTop: 2 }, selectionActions: { flexDirection: 'row', gap: 9, marginTop: spacing.md }, open: { flex: 1, borderRadius: radius.pill, backgroundColor: colors.ice, minHeight: 42, alignItems: 'center', justifyContent: 'center' }, openText: { ...type.callout, color: colors.ink }, expand: { flex: 1, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, minHeight: 42, alignItems: 'center', justifyContent: 'center' }, expandText: { ...type.callout, color: colors.text }, depth: { width: 44, height: 42, borderRadius: 21, borderWidth: 1, borderColor: colors.lineStrong, alignItems: 'center', justifyContent: 'center' }, depthText: { ...type.metadata, color: colors.cyan }, list: { padding: spacing.lg, paddingBottom: 120 }, listRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }, listName: { ...type.section, color: colors.text }, listSub: { ...type.callout, color: colors.textMuted, marginTop: 2 },
+});
